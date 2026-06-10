@@ -6,8 +6,10 @@ from pyrogram.types import Message
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 LIBRARY_ID = os.environ.get("LIBRARY_ID")
 API_KEY = os.environ.get("API_KEY")
+API_ID = int(os.environ.get("API_ID"))
+API_HASH = os.environ.get("API_HASH")
 
-app = Client("bunny_bot", bot_token=BOT_TOKEN)
+app = Client("bunny_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 bunny_headers = {
     "AccessKey": API_KEY,
