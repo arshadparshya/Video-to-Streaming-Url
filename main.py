@@ -23,12 +23,9 @@ async def handle_file(client: Client, message: Message):
     msg = await message.reply_text("⏳ **Downloading...**")
 
     try:
-        # Download
         local_path = await client.download_media(message)
-        await msg.delete()
-        await message.reply_text("📤 **Uploading to BunnyCDN...**")
+        await msg.edit_text("📤 **Uploading to BunnyCDN...**")
 
-        # Create video entry on Bunny
         create_url = f"https://video.bunnycdn.com/library/{LIBRARY_ID}/videos"
 
         async with aiohttp.ClientSession() as session:
@@ -37,11 +34,9 @@ async def handle_file(client: Client, message: Message):
 
         video_id = create_res.get("guid") or create_res.get("id")
         if not video_id:
-            await msg.delete()
-        await message.reply_text("❌ **Bunny API Error!**")
+            await msg.edit_text("❌ **Bunny API Error!**")
             return
 
-        # Upload to Bunny
         upload_url = f"https://video.bunnycdn.com/library/{LIBRARY_ID}/videos/{video_id}"
         upload_headers = {
             "AccessKey": API_KEY,
@@ -52,7 +47,6 @@ async def handle_file(client: Client, message: Message):
             with open(local_path, 'rb') as f:
                 await session.put(upload_url, headers=upload_headers, data=f)
 
-        # Cleanup
         os.remove(local_path)
 
         player_url = f"https://player.mediadelivery.net/play/{LIBRARY_ID}/{video_id}"
@@ -69,8 +63,7 @@ async def handle_file(client: Client, message: Message):
         )
 
     except Exception as e:
-        await msg.delete()
-        await message.reply_text(f"❌ **Error:** `{str(e)}`")
+        await msg.edit_text(f"❌ **Error:** `{str(e)}`")
         if 'local_path' in locals() and os.path.exists(local_path):
             os.remove(local_path)
 
