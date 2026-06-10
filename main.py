@@ -53,8 +53,8 @@ async def handle_file(client: Client, message: Message):
         # Cleanup
         os.remove(local_path)
 
-        player_url = f"https://iframe.mediadelivery.net/play/{LIBRARY_ID}/{video_id}"
-        embed_url = f"https://iframe.mediadelivery.net/embed/{LIBRARY_ID}/{video_id}"
+        player_url = f"https://player.mediadelivery.net/play/{LIBRARY_ID}/{video_id}"
+        embed_url = f"https://player.mediadelivery.net/embed/{LIBRARY_ID}/{video_id}"
 
         await msg.edit_text(
             f"✅ **Upload Successful!**\n\n"
