@@ -1,5 +1,5 @@
 import os
-import requests
+import aiohttp
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
@@ -25,19 +25,20 @@ async def handle_file(client: Client, message: Message):
     try:
         # Download
         local_path = await client.download_media(message)
-        await msg.edit_text("📤 **Uploading to BunnyCDN...**")
+        await msg.delete()
+        await message.reply_text("📤 **Uploading to BunnyCDN...**")
 
         # Create video entry on Bunny
         create_url = f"https://video.bunnycdn.com/library/{LIBRARY_ID}/videos"
-        create_res = requests.post(
-            create_url,
-            json={"title": file_name},
-            headers=bunny_headers
-        ).json()
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(create_url, json={"title": file_name}, headers=bunny_headers) as resp:
+                create_res = await resp.json()
 
         video_id = create_res.get("guid") or create_res.get("id")
         if not video_id:
-            await msg.edit_text("❌ **Bunny API Error!**")
+            await msg.delete()
+        await message.reply_text("❌ **Bunny API Error!**")
             return
 
         # Upload to Bunny
@@ -47,8 +48,9 @@ async def handle_file(client: Client, message: Message):
             "Content-Type": "video/*"
         }
 
-        with open(local_path, 'rb') as f:
-            requests.put(upload_url, headers=upload_headers, data=f)
+        async with aiohttp.ClientSession() as session:
+            with open(local_path, 'rb') as f:
+                await session.put(upload_url, headers=upload_headers, data=f)
 
         # Cleanup
         os.remove(local_path)
@@ -56,7 +58,8 @@ async def handle_file(client: Client, message: Message):
         player_url = f"https://player.mediadelivery.net/play/{LIBRARY_ID}/{video_id}"
         embed_url = f"https://player.mediadelivery.net/embed/{LIBRARY_ID}/{video_id}"
 
-        await msg.edit_text(
+        await msg.delete()
+        await message.reply_text(
             f"✅ **Upload Successful!**\n\n"
             f"🎬 **File:** `{file_name}`\n"
             f"🆔 **ID:** `{video_id}`\n\n"
@@ -66,7 +69,8 @@ async def handle_file(client: Client, message: Message):
         )
 
     except Exception as e:
-        await msg.edit_text(f"❌ **Error:** `{str(e)}`")
+        await msg.delete()
+        await message.reply_text(f"❌ **Error:** `{str(e)}`")
         if 'local_path' in locals() and os.path.exists(local_path):
             os.remove(local_path)
 
