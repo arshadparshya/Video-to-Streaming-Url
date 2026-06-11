@@ -46,22 +46,20 @@ async def handle_file(client: Client, message: Message):
         await message.reply_text(
             f"📋 **Queue mein add hua!**\n"
             f"🔢 **Position:** `{pos}`\n"
-            f"⏳ Pehli file hone ke baad aapki file process hogi"
+            f"⏳ Pehli file complete hone ke baad process hogi",
+            quote=True
         )
 
 async def upload_file(message: Message):
     media = message.video or message.document
     file_name = getattr(media, 'file_name', None) or 'video.mp4'
 
-    # Reply original file message ko
-    status_msg = await message.reply_text("⬇️ **Downloading...**")
+    status_msg = await message.reply_text("⬇️ **Downloading...**", quote=True)
 
     try:
-        # Download
         local_path = await app.download_media(message)
         await status_msg.edit_text("📤 **Uploading to BunnyCDN...**")
 
-        # Create video on Bunny
         create_url = f"https://video.bunnycdn.com/library/{LIBRARY_ID}/videos"
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -76,7 +74,6 @@ async def upload_file(message: Message):
             await status_msg.edit_text("❌ **Bunny API Error!**")
             return
 
-        # Upload file
         upload_url = f"https://video.bunnycdn.com/library/{LIBRARY_ID}/videos/{video_id}"
         upload_headers = {"AccessKey": API_KEY, "Content-Type": "video/*"}
 
@@ -89,17 +86,16 @@ async def upload_file(message: Message):
         player_url = f"https://player.mediadelivery.net/play/{LIBRARY_ID}/{video_id}"
         embed_url = f"https://player.mediadelivery.net/embed/{LIBRARY_ID}/{video_id}"
 
-        # Status message delete karo
         await status_msg.delete()
 
-        # Original file message ko reply karo ✅
         await message.reply_text(
             f"✅ **Upload Successful!**\n\n"
             f"🎬 **File:** `{file_name}`\n"
             f"🆔 **ID:** `{video_id}`\n\n"
             f"▶️ **Player Link:**\n`{player_url}`\n\n"
             f"🔗 **Embed Link:**\n`{embed_url}`\n\n"
-            f"_(Processing mein 1-2 min lagega)_"
+            f"_(RUK JAAAAAAAA Time Lagegaaaaaaa)_",
+            quote=True
         )
 
     except Exception as e:
