@@ -20,57 +20,65 @@ bunny_headers = {
 
 # ═══ QUEUE ═══
 upload_queue = asyncio.Queue()
-queue_processing = False
+is_processing = False
 
-async def process_queue():
-    global queue_processing
-    queue_processing = True
-    while not upload_queue.empty():
-        message = await upload_queue.get()
+async def worker():
+    global is_processing
+    is_processing = True
+    while True:
+        try:
+            message = upload_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
         await upload_file(message)
         upload_queue.task_done()
-        await asyncio.sleep(1)
-    queue_processing = False
+    is_processing = False
 
 @app.on_message(filters.video | filters.document)
 async def handle_file(client: Client, message: Message):
-    global queue_processing
-
-    pos = upload_queue.qsize() + 1
+    global is_processing
     await upload_queue.put(message)
+    pos = upload_queue.qsize()
 
-    if pos == 1 and not queue_processing:
-        await message.reply_text("⏳ **Processing your file...**")
-        asyncio.create_task(process_queue())
+    if not is_processing:
+        asyncio.create_task(worker())
     else:
-        await message.reply_text(f"📋 **Queue mein add hua!**\n🔢 Position: `{pos}`")
+        await message.reply_text(
+            f"📋 **Queue mein add hua!**\n"
+            f"🔢 **Position:** `{pos}`\n"
+            f"⏳ Pehli file hone ke baad aapki file process hogi"
+        )
 
 async def upload_file(message: Message):
     media = message.video or message.document
     file_name = getattr(media, 'file_name', None) or 'video.mp4'
 
-    msg = await message.reply_text("⬇️ **Downloading...**")
+    # Reply original file message ko
+    status_msg = await message.reply_text("⬇️ **Downloading...**")
 
     try:
-        local_path = await message._client.download_media(message)
-        await msg.edit_text("📤 **Uploading to BunnyCDN...**")
+        # Download
+        local_path = await app.download_media(message)
+        await status_msg.edit_text("📤 **Uploading to BunnyCDN...**")
 
+        # Create video on Bunny
         create_url = f"https://video.bunnycdn.com/library/{LIBRARY_ID}/videos"
-
         async with aiohttp.ClientSession() as session:
-            async with session.post(create_url, json={"title": file_name}, headers=bunny_headers) as resp:
+            async with session.post(
+                create_url,
+                json={"title": file_name},
+                headers=bunny_headers
+            ) as resp:
                 create_res = await resp.json()
 
         video_id = create_res.get("guid") or create_res.get("id")
         if not video_id:
-            await msg.edit_text("❌ **Bunny API Error!**")
+            await status_msg.edit_text("❌ **Bunny API Error!**")
             return
 
+        # Upload file
         upload_url = f"https://video.bunnycdn.com/library/{LIBRARY_ID}/videos/{video_id}"
-        upload_headers = {
-            "AccessKey": API_KEY,
-            "Content-Type": "video/*"
-        }
+        upload_headers = {"AccessKey": API_KEY, "Content-Type": "video/*"}
 
         async with aiohttp.ClientSession() as session:
             with open(local_path, 'rb') as f:
@@ -81,7 +89,10 @@ async def upload_file(message: Message):
         player_url = f"https://player.mediadelivery.net/play/{LIBRARY_ID}/{video_id}"
         embed_url = f"https://player.mediadelivery.net/embed/{LIBRARY_ID}/{video_id}"
 
-        await msg.delete()
+        # Status message delete karo
+        await status_msg.delete()
+
+        # Original file message ko reply karo ✅
         await message.reply_text(
             f"✅ **Upload Successful!**\n\n"
             f"🎬 **File:** `{file_name}`\n"
@@ -92,7 +103,7 @@ async def upload_file(message: Message):
         )
 
     except Exception as e:
-        await msg.edit_text(f"❌ **Error:** `{str(e)}`")
+        await status_msg.edit_text(f"❌ **Error:** `{str(e)}`")
         if 'local_path' in locals() and os.path.exists(local_path):
             os.remove(local_path)
 
