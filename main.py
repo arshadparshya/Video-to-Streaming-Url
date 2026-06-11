@@ -1,4 +1,5 @@
 import os
+import asyncio
 import aiohttp
 from pyrogram import Client, filters
 from pyrogram.types import Message
@@ -17,15 +18,41 @@ bunny_headers = {
     "accept": "application/json"
 }
 
+# ═══ QUEUE ═══
+upload_queue = asyncio.Queue()
+queue_processing = False
+
+async def process_queue():
+    global queue_processing
+    queue_processing = True
+    while not upload_queue.empty():
+        message = await upload_queue.get()
+        await upload_file(message)
+        upload_queue.task_done()
+        await asyncio.sleep(1)
+    queue_processing = False
+
 @app.on_message(filters.video | filters.document)
 async def handle_file(client: Client, message: Message):
+    global queue_processing
+
+    pos = upload_queue.qsize() + 1
+    await upload_queue.put(message)
+
+    if pos == 1 and not queue_processing:
+        await message.reply_text("⏳ **Processing your file...**")
+        asyncio.create_task(process_queue())
+    else:
+        await message.reply_text(f"📋 **Queue mein add hua!**\n🔢 Position: `{pos}`")
+
+async def upload_file(message: Message):
     media = message.video or message.document
     file_name = getattr(media, 'file_name', None) or 'video.mp4'
 
-    msg = await message.reply_text("⏳ **Downloading...**")
+    msg = await message.reply_text("⬇️ **Downloading...**")
 
     try:
-        local_path = await client.download_media(message)
+        local_path = await message._client.download_media(message)
         await msg.edit_text("📤 **Uploading to BunnyCDN...**")
 
         create_url = f"https://video.bunnycdn.com/library/{LIBRARY_ID}/videos"
